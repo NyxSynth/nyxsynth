@@ -113,6 +113,7 @@ class Blockchain:
         self.neural_validator = NeuralValidator()
         self.bcp_coordinator = BioluminescentCoordinator()
         self.quantum_crypto = QuantumResistantCrypto()
+        self.consensus_threshold = 0.65  # Added consensus threshold for validation
         
         # Create genesis block
         self.create_genesis_block()
@@ -133,13 +134,48 @@ class Blockchain:
         """Get the latest block in the chain."""
         return self.chain[-1]
     
+    def integrate_consensus_validation(self, transaction: Transaction) -> bool:
+        """
+        Integrate consensus and validation components for complete transaction verification.
+        
+        Args:
+            transaction: Transaction to verify
+            
+        Returns:
+            True if transaction passes all checks
+        """
+        # 1. Basic verification
+        if not transaction.verify():
+            return False
+        
+        # 2. Neural validation
+        validation_result = self.neural_validator.validate_transaction(transaction, self)
+        if not validation_result:
+            return False
+        
+        # 3. Check transaction pattern against consensus
+        tx_pattern = self.neural_validator._transaction_to_pattern(transaction)
+        sync_score = self.bcp_coordinator.get_synchronization_score(tx_pattern)
+        
+        # Transaction must have minimum synchronization with network consensus
+        if sync_score < self.consensus_threshold:
+            return False
+        
+        # 4. Check for potential adversarial behavior
+        is_anomalous = self.neural_validator._check_pattern_anomaly(tx_pattern, [transaction])
+        if is_anomalous:
+            return False
+        
+        return True
+    
     def add_transaction(self, transaction):
         """Add a transaction to pending transactions."""
         if not transaction.sender or not transaction.recipient:
             raise ValueError("Transaction must include sender and recipient")
         
-        if not transaction.verify():
-            raise ValueError("Transaction signature verification failed")
+        # Use the new integrated consensus validation instead of simple verification
+        if not self.integrate_consensus_validation(transaction):
+            raise ValueError("Transaction validation failed")
         
         self.pending_transactions.append(transaction)
         return self.get_latest_block().index + 1
